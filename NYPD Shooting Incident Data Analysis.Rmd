@@ -1,0 +1,186 @@
+---
+title: "NYPD Shooting Incident Data Analysis"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-08-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+First, I load in tidyverse, read in the data and look at a summary to understand what I am working with.
+
+### Load tidyverse
+```{r tidyverse}
+library(tidyverse)
+```
+
+## Read in the data
+```{r read_in}
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+mydata <- read_csv(url_in)
+```
+
+## Summary of data
+```{r summary}
+summary(mydata)
+```
+
+When looking at the summary, there are a lot of columns that I don't plan on needing for my analysis. I will remove all unneeded columns and rename the needed columns.
+
+## Remove unnecessary columns 
+```{r remove_columns}
+mydata_cleaned <- mydata[ , -c(5,7, 8, 9, 10, 11, 12, 13,14, 15, 16, 17, 18, 19, 20, 21)]
+```
+
+## Rename Columns
+```{r rename_columns}
+colnames(mydata_cleaned) <- c("id", "date", "time", "boro", "precint")
+```
+
+Next, I need to adjust the format of the date column.
+
+## Adjust format of date column
+```{r format_date}
+class(mydata_cleaned$date)
+mydata_cleaned$date <- as.Date(mydata_cleaned$date, format = "%m/%d/%Y")
+class(mydata_cleaned$date)
+```
+
+After making the adjustments, here is what the data looks like.
+
+## Summary post-clean
+```{r summary_post_clean}
+summary(mydata_cleaned)
+```
+
+Next I load the two libraries that I will use to create visualizations.
+
+### Load ggplot2
+```{r ggplot2}
+library(ggplot2)
+```
+
+### Load lubridate
+```{r lubridate}
+library(lubridate)
+```
+
+Now, I want to get a quick visual of what my data looks like so I use a histogram with bins set to 20 days to get a general idea of how the data is distributed.
+
+# Viz 1 
+```{r viz1}
+ggplot(mydata_cleaned, aes(x = date)) +
+  geom_histogram(binwidth = 20, fill = "black") +
+  labs(title = "Histogram of Incidents Over Time",
+       x = "Date",
+       y = "Count") +
+  theme_minimal()
+```
+
+After looking at Viz 1, I now want to plot this data as a time series. Next I load in the doplyr package.
+
+### Load dplyr
+```{r dplyr}
+library(dplyr)
+```
+
+I now group the data by date and sum the count off all cases for each date. Then I plot this data which is very similar to Viz 1.
+
+## Group data by date
+```{r group_by_date}
+mydata_grouped <- mydata_cleaned %>%
+  group_by(date) %>%
+  summarize(count = n())
+```
+
+# Viz 2
+```{r viz2}
+ggplot(mydata_grouped, aes(x = date, y = count)) +
+  geom_line(color = "black") +
+  labs(title = "Plot of Incidents Over Time",
+       x = "Date",
+       y = "Count") +
+  theme_minimal()
+```
+
+Now I add a linear model line to get an idea of a basic trend across the entire data. 
+
+# Viz 2 with Linear Model
+```{r viz2_lm}
+ggplot(mydata_grouped, aes(x = date, y = count)) +
+  geom_line(color = "black") +
+  geom_smooth(method = "lm", col = "red") +
+  labs(title = "Time Series Plot with Linear Model",
+       x = "Date",
+       y = "Count") +
+  theme_minimal()
+```
+
+Looking at Viz 2, there is a downward trend of cases. I also noticed the spike in the summer of 2020. Let me filter the data to start right after the spike and see if the same trend still exists.
+
+## Create filtered dataset
+```{r filter_data}
+mydata_filtered <- mydata_grouped %>%
+  filter(date >= as.Date("2020-07-15") & date <= as.Date("2024-01-01"))
+```
+
+# Viz 3
+```{r viz3}
+ggplot(mydata_filtered, aes(x = date, y = count)) +
+  geom_line(color = "black") +
+  labs(title = "Time Series Plot for Specific Date Range",
+       x = "Date",
+       y = "Count") +
+  scale_x_date(limits = c(as.Date("2020-07-15"), as.Date("2024-01-01"))) +
+  theme_minimal()
+```
+
+# Viz 3 with new linear model
+```{r viz3_newlm}
+ggplot(mydata_filtered, aes(x = date, y = count)) +
+  geom_line(color = "black") +  
+  geom_smooth(method = "lm", col = "red") +
+  labs(title = "Time Series Plot with Linear Model for Specific Date Range",
+       x = "Date",
+       y = "Count") +
+  scale_x_date(limits = c(as.Date("2020-07-15"), as.Date("2024-01-01"))) +  
+  theme_minimal()
+```
+
+Viz 3 shows that the same trend exists after the spike in Summer 2020.
+
+Lastly, I noticed that each year had spikes and I want to see if there is a pattern of where these spikes occur. Viz 4 combines all cases from each month regardless of year to see how the month impacts the cases reported.
+
+## Create new column for month
+```{r month_column}
+mydata_cleaned$month <- month(mydata_cleaned$date, label = TRUE)
+```
+
+## Viz 4
+```{r viz4}
+ggplot(mydata_cleaned, aes(x = month)) +
+  geom_bar(fill = "black") +
+  labs(title = "Histogram of Incidents by Month",
+       x = "Month",
+       y = "Count") +
+  theme_minimal()
+```
+
+Viz 4 shors that the count of cases generally is highest in the summer months.
+
+## Conclusion
+From the above visuals, I was able to identify different trends in the dataset. OVerall, the number of cases is trending downward even with the spike seen in Summer 2020. The data also shows that the number of cases is highest in the summer months.
+These trends raise additional questions where further analysis would be needed to understand why these trends exist. 
+
+## Bias
+I also want to call out the possible bias that may exist in this dataset and analysis. This data is biased towards reported crimes/cases and will not accurately represent areas where crime is often not reported. This analysis was only looking at the reported crimes.
+
+
+### Session Info
+```{r session_info}
+sessionInfo()
+```
+
